@@ -18,11 +18,11 @@
 
 const mongoose = require('mongoose');
 
-/**
- * Global cached connection for serverless.
- * Vercel may spin up multiple containers. This ensures each container
- * reuses its own connection instead of opening a new one per request.
- */
+/* -------------------------------------------------------------------------- */
+/*                    Serverless-friendly cached connection                    */
+/*  Vercel reuses warm containers. Caching on `global` means we don't open a   */
+/*  new MongoDB connection on every request — we reuse the existing one.       */
+/* -------------------------------------------------------------------------- */
 let cached = global.mongoose;
 
 if (!cached) {
@@ -31,31 +31,33 @@ if (!cached) {
 
 const connectDB = async () => {
   /* If we already have a live connection, reuse it */
-  if (cached.conn) {
-    return cached.conn;
-  }
+  if (cached.conn) return cached.conn;
 
-  /* If a connection is already in-flight, wait for it */
+  /* If a connection is already in-flight, wait for that same promise */
   if (!cached.promise) {
-    const opts = {
-      serverSelectionTimeoutMS: 10000,
-      maxPoolSize: 5,
-      bufferCommands: false
-    };
+    console.log('🔌 Connecting to MongoDB...');
 
-    cached.promise = mongoose.connect(process.env.MONGO_URI, opts).then((m) => {
-      console.log(`✅ MongoDB connected: ${m.connection.host}`);
-      console.log(`📦 Using database: ${m.connection.name}`);
-      return m;
-    });
+    cached.promise = mongoose
+      .connect(process.env.MONGO_URI, {
+        /* Serverless-friendly options */
+        bufferCommands: false,          // fail fast instead of buffering 10s
+        serverSelectionTimeoutMS: 10000, // cap connection attempts at 10s
+        maxPoolSize: 5                  // small pool for stateless functions
+      })
+      .then((m) => {
+        console.log(`✅ MongoDB connected: ${m.connection.host}`);
+        console.log(`📦 Using database: ${m.connection.name}`);
+        return m;
+      });
   }
 
   try {
     cached.conn = await cached.promise;
-  } catch (error) {
+  } catch (err) {
+    /* Reset the cached promise so the next request can retry */
     cached.promise = null;
-    console.error(`❌ MongoDB connection failed: ${error.message}`);
-    throw error;
+    console.error(`❌ MongoDB connection failed: ${err.message}`);
+    throw err;
   }
 
   return cached.conn;
