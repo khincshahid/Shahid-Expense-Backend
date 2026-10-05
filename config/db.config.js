@@ -19,12 +19,9 @@
 const mongoose = require('mongoose');
 
 /**
- * Global cached connection.
- * In serverless (Vercel), the Node.js process may be reused between
- * invocations ("warm start"). Caching the connection here ensures we
- * reuse it instead of opening a new one on every request.
- *
- * The database name is taken from MONGO_URI (the segment after `.net/`).
+ * Global cached connection for serverless.
+ * Vercel may spin up multiple containers. This ensures each container
+ * reuses its own connection instead of opening a new one per request.
  */
 let cached = global.mongoose;
 
@@ -42,7 +39,6 @@ const connectDB = async () => {
   if (!cached.promise) {
     const opts = {
       serverSelectionTimeoutMS: 10000,
-      /* Serverless-friendly pool size — keep it small */
       maxPoolSize: 5,
       bufferCommands: false
     };
@@ -57,7 +53,6 @@ const connectDB = async () => {
   try {
     cached.conn = await cached.promise;
   } catch (error) {
-    /* On failure, clear the promise so the next request retries */
     cached.promise = null;
     console.error(`❌ MongoDB connection failed: ${error.message}`);
     throw error;
