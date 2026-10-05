@@ -51,11 +51,37 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 
-/* -------------------- Routes -------------------- */
+/* -------------------- Public routes (no DB needed) -------------------- */
+app.get('/', (req, res) => {
+  res.status(200).json({
+    name: 'Shahid Expense API',
+    status: 'running'
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', service: 'Shahid Expense API' });
 });
 
+/* -------------------- DB Connection Middleware -------------------- */
+/* On Vercel (serverless), there is no long-running startup phase.
+   Every request must ensure the DB is connected before running a query.
+   Thanks to the cached connection in db.config.js, only the first request
+   actually opens a connection — the rest reuse it instantly. */
+app.use('/api', async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error('❌ DB connect error on route:', req.originalUrl, error.message);
+    return res.status(500).json({
+      message: 'Database connection failed',
+      detail: error.message
+    });
+  }
+});
+
+/* -------------------- Routes -------------------- */
 app.use('/api/auth', authRoute);
 app.use('/api/categories', categoryRoute);
 app.use('/api/transactions', transactionRoute);
@@ -67,8 +93,8 @@ app.use((req, res) => {
 
 /* -------------------- Local development listener -------------------- */
 /* On Vercel, `app.listen` is not called — the platform handles the
-   request/response cycle. Locally, we need to start the server ourselves. */
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+   request/response cycle. Locally, we start the server ourselves. */
+if (!process.env.VERCEL) {
   const PORT = process.env.PORT || 5000;
 
   connectDB()
@@ -84,6 +110,4 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
 }
 
 /* -------------------- Export for Vercel -------------------- */
-/* Vercel imports this file and expects a default-exported Express app.
-   The connection is established lazily on the first request. */
 module.exports = app;
