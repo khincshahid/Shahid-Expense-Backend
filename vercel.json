@@ -10,5 +10,11 @@
     "api/index.js": {
       "maxDuration": 30
     }
+  },
+  "outputFileTracingIncludes": {
+    "api/index.js": [
+      "node_modules/pdfkit/js/data/*.afm",
+      "node_modules/pdfkit/js/standard-fonts/*.cjs"
+    ]
   }
 }
