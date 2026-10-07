@@ -18,7 +18,8 @@ const formatDate = (d) => {
   const date = new Date(d);
   const day = String(date.getDate()).padStart(2, '0');
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${day} ${months[date.getMonth()]} ${date.getFullYear()}`;
+  const month = months[date.getMonth()];
+  return `${month} ${day} ${date.getFullYear()}`;
 };
 
 const formatMoney = (n) =>
